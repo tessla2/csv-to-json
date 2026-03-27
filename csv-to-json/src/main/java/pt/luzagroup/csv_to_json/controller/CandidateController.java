@@ -1,8 +1,9 @@
-package controller;
+package pt.luzagroup.csv_to_json.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import service.CandidateService;
+import pt.luzagroup.csv_to_json.service.CandidateService;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,13 +12,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
+@RequiredArgsConstructor
 public class CandidateController {
 
     private final CandidateService candidateService;
 
-    public CandidateController(CandidateService candidateService) {
-        this.candidateService = candidateService;
-    }
 
     //Json de candidatos
     @GetMapping("/candidates/json")

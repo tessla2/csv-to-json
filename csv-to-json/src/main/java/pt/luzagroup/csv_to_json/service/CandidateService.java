@@ -1,13 +1,22 @@
-package service;
+package pt.luzagroup.csv_to_json.service;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.opencsv.CSVParser;
+import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvException;
+import com.opencsv.exceptions.CsvMalformedLineException;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -18,52 +27,46 @@ import java.util.stream.Collectors;
 @Service
 public class CandidateService {
 
-    private static final String UPLOAD_PATH = "/mnt/user-data/uploads/";
-    private static final String OUTPUT_PATH = "/mnt/user-data/outputs/candidates.json";
+    @Value("${app.input-path}")
+    private String uploadPath;
+
+    @Value("${app.output-path}")
+    private String outputPath;
+
+    @Value("${app.output-filename}")
+    private String outputFilename;
+
     private static final int STARTING_ID = 10001;
 
     private Map<String, Map<String, String>> candidatesMap;
     private List<Map<String, String>> experiencesList;
     private List<Map<String, String>> experiencesIIList;
     private List<Map<String, String>> educationList;
-    private List<Map<String, String>> certificationsList;
+    private List<Map<String, String>> certificationList;
     private List<Map<String, String>> notesList;
 
-    public CandidateService() {
-        try {
-            System.out.println("Carregando arquivos CSV...");
+    public void runConversion() throws Exception {
+        System.out.println("Carregando arquivos CSV...");
 
-            candidatesMap = loadCSVAsMap(UPLOAD_PATH + "Candidates_001.csv", "Candidate Id");
-            experiencesList = loadCSVAsList(UPLOAD_PATH + "Candidates_Experience_Details.csv");
-            experiencesIIList = loadCSVAsList(UPLOAD_PATH + "Candidates_Experience_Details_II.csv");
-            educationList = loadCSVAsList(UPLOAD_PATH + "Candidates_Educational_Details.csv");
-            certificationsList = loadCSVAsList(UPLOAD_PATH + "Candidates_Certifications_Details.csv");
-            notesList = loadCSVAsList(UPLOAD_PATH + "Notes_001.csv");
+            candidatesMap = loadCSVAsMap(uploadPath + "Candidates_001.csv", "Candidate Id");
+            experiencesList = loadCSVAsList(uploadPath + "Candidates_Experience_Details.csv");
+            experiencesIIList = loadCSVAsList(uploadPath + "Candidates_Experience_Details_II.csv");
+            educationList = loadCSVAsList(uploadPath + "Candidates_Educational_Details.csv");
+            certificationList = loadCSVAsList(uploadPath + "Candidates_Certifications_Details.csv");
+            notesList = loadCSVAsList(uploadPath + "Notes_001.csv");
 
             System.out.println("Candidatos: " + candidatesMap.size());
             System.out.println("Experiências: " + experiencesList.size());
             System.out.println("Experiências II: " + experiencesIIList.size());
             System.out.println("Educação: " + educationList.size());
-            System.out.println("Certificações: " + certificationsList.size());
+            System.out.println("Certificações: " + certificationList.size());
             System.out.println("Notas: " + notesList.size());
 
-            List<Map<String, Object>> result = processAllCandidates();
-            saveJSON(result);
+        List<Map<String, Object>> result = processAllCandidates();
 
-            System.out.println("\n✅ Conversão concluída!");
-            System.out.println("📊 Total de candidatos processados: " + result.size());
-            System.out.println("💾 Arquivo salvo: " + OUTPUT_PATH);
+        saveJSON(result);
 
-            if (!result.isEmpty()) {
-                System.out.println("\n📋 Exemplo do primeiro candidato:");
-                Gson gson = new GsonBuilder().setPrettyPrinting().create();
-                System.out.println(gson.toJson(result.get(0)));
-            }
-
-        } catch (Exception e) {
-            System.err.println("❌ Erro durante conversão: " + e.getMessage());
-            e.printStackTrace();
-        }
+        System.out.println("✅ Conversão concluída!");
     }
 
     // ----------------------------
@@ -73,8 +76,18 @@ public class CandidateService {
             throws IOException, CsvException {
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
 
-        try (CSVReader reader = new CSVReader(new InputStreamReader(
-                new FileInputStream(filePath), StandardCharsets.UTF_8))) {
+        CSVParser parser = new CSVParserBuilder()
+                .withSeparator(',')
+                .withQuoteChar('"')
+                .withStrictQuotes(false)
+                .withIgnoreQuotations(false)
+                .build();
+
+        try (CSVReader reader = new CSVReaderBuilder(
+                new InputStreamReader(new FileInputStream(filePath), StandardCharsets.UTF_8))
+                .withCSVParser(parser)
+                .build()) {
+
             List<String[]> rows = reader.readAll();
             if (rows.isEmpty()) return result;
 
@@ -99,20 +112,38 @@ public class CandidateService {
     private List<Map<String, String>> loadCSVAsList(String filePath) throws IOException, CsvException {
         List<Map<String, String>> result = new ArrayList<>();
 
-        try (CSVReader reader = new CSVReader(new InputStreamReader(
-                new FileInputStream(filePath), StandardCharsets.UTF_8))) {
-            List<String[]> rows = reader.readAll();
-            if (rows.isEmpty()) return result;
+        CSVParser parser = new CSVParserBuilder()
+                .withSeparator(',')
+                .withQuoteChar('"')
+                .withStrictQuotes(false)
+                .withIgnoreQuotations(false)
+                .build();
 
-            String[] headers = rows.get(0);
-            for (int i = 1; i < rows.size(); i++) {
-                String[] row = rows.get(i);
-                Map<String, String> rowMap = new HashMap<>();
-                for (int j = 0; j < headers.length && j < row.length; j++) {
-                    rowMap.put(headers[j], row[j]);
+        try (CSVReader reader = new CSVReaderBuilder(
+                new InputStreamReader(new FileInputStream(filePath), StandardCharsets.UTF_8))
+                .withCSVParser(parser)
+                .build()) {
+
+            String[] headers = reader.readNext();
+            if (headers == null) return result;
+
+            String[] row;
+            int lineNum = 1; // linha do CSV (contando header)
+            while ((row = reader.readNext()) != null) {
+                lineNum++;
+                try {
+                    Map<String, String> rowMap = new HashMap<>();
+                    for (int j = 0; j < headers.length && j < row.length; j++) {
+                        rowMap.put(headers[j], row[j]);
+                    }
+                    result.add(rowMap);
+                } catch (Exception e) {
+                    System.err.println("❌ Erro na linha " + lineNum + ": " + e.getMessage());
+                    // ignora a linha e continua
                 }
-                result.add(rowMap);
             }
+        } catch (CsvMalformedLineException e) {
+            System.err.println("❌ CSV mal formatado: " + e.getMessage());
         }
 
         return result;
@@ -183,9 +214,8 @@ public class CandidateService {
         if (!isEmpty(linkedin) && !linkedin.startsWith("http")) linkedin = "https://" + linkedin;
         putIfNotEmpty(candidate, "linkedin", linkedin);
 
-        putIfNotEmpty(candidate, "github", cleanValue(row.get("github")));
 
-        List<String> languages = extractLanguages(row.get("Stacks LinkedIn"));
+        List<String> languages = extractLanguages(row.get("Languages"));
         if (!languages.isEmpty()) candidate.put("languages", languages);
 
         List<String> skills = extractSkills(row);
@@ -286,7 +316,7 @@ public class CandidateService {
         Set<String> skillsSet = new LinkedHashSet<>();
         String skillSet = row.get("Skill Set");
         if (!isEmpty(skillSet)) skillsSet.addAll(splitByComma(skillSet));
-        String stacks = row.get("Stacks");
+        String stacks = row.get("Stacks Linkedin");
         if (!isEmpty(stacks)) skillsSet.addAll(splitByComma(stacks));
         return skillsSet.stream().filter(s -> s.length() > 2).limit(20).collect(Collectors.toList());
     }
@@ -432,10 +462,22 @@ public class CandidateService {
         return obj;
     }
 
-    private void saveJSON(List<Map<String, Object>> data) throws IOException {
+    public void saveJSON(List<Map<String, Object>> data) throws IOException {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(OUTPUT_PATH), StandardCharsets.UTF_8)) {
+
+        Path outputDir = Paths.get(outputPath); // outputPath vem do AppConfig
+        if (!Files.exists(outputDir)) {
+            Files.createDirectories(outputDir); // cria a pasta se não existir
+            System.out.println("✅ Pasta de saída criada: " + outputDir.toAbsolutePath());
+        }
+
+        Path outputFile = outputDir.resolve(outputFilename);
+
+        try (Writer writer = new OutputStreamWriter(
+                new FileOutputStream(outputFile.toFile()), StandardCharsets.UTF_8)) {
             gson.toJson(data, writer);
         }
+
+        System.out.println("✅ JSON salvo em: " + outputFile.toAbsolutePath());
     }
 }
