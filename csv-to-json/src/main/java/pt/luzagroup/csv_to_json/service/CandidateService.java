@@ -46,8 +46,10 @@ public class CandidateService {
     public void runConversion() throws Exception {
         System.out.println("Carregando arquivos CSV...");
 
-        // --- Leitura CSV usando CsvUtils que corrige aspas e quebras de linha ---
-        List<Map<String, String>> candidatesList = CsvUtils.readCsvWithUniVocity(uploadPath + "Candidates_001.csv");
+        // --- Leitura CSV ---
+        List<Map<String, String>> candidatesList =
+                CsvUtils.readCsvWithUniVocity(uploadPath + "Candidates_001.csv");
+
         candidatesMap = candidatesList.stream()
                 .collect(Collectors.toMap(
                         row -> row.get("Candidate Id"),
@@ -62,23 +64,54 @@ public class CandidateService {
         certificationList = CsvUtils.readCsvWithUniVocity(uploadPath + "Candidates_Certifications_Details.csv");
         notesList = CsvUtils.readCsvWithUniVocity(uploadPath + "Notes_001.csv");
 
+        // --- Logs de input ---
+        System.out.println("Candidatos CSV: " + candidatesMap.size());
+        System.out.println("Experiences CSV: " + experiencesList.size());
+        System.out.println("Experiences II CSV: " + experiencesIIList.size());
+        System.out.println("Education CSV: " + educationList.size());
+        System.out.println("Certifications CSV: " + certificationList.size());
+        System.out.println("Notes CSV: " + notesList.size());
 
-        // --- Processamento de candidatos com AtomicInteger para IDs ---
+        // --- Processamento ---
         AtomicInteger counter = new AtomicInteger(10001);
+        AtomicInteger success = new AtomicInteger();
+        AtomicInteger failed = new AtomicInteger();
+
         List<Map<String, Object>> result = candidatesMap.entrySet().stream()
-                .map(entry -> candidateMapper.mapCandidate(
-                        entry.getKey(),
-                        entry.getValue(),
-                        counter.getAndIncrement(),
-                        experiencesList,
-                        experiencesIIList,
-                        educationList,
-                        notesList
-                ))
-                .map(helper::cleanMap)
+                .map(entry -> {
+                    try {
+                        Map<String, Object> mapped = candidateMapper.mapCandidate(
+                                entry.getKey(),
+                                entry.getValue(),
+                                counter.getAndIncrement(),
+                                experiencesList,
+                                experiencesIIList,
+                                educationList,
+                                notesList
+                        );
+
+                        success.incrementAndGet();
+                        return helper.cleanMap(mapped);
+
+                    } catch (Exception e) {
+                        failed.incrementAndGet();
+                        System.err.println("❌ Erro no candidateId " + entry.getKey() + ": " + e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
+        // 🔥 AQUI está o saveJSON (não mudou de lugar)
         saveJSON(result);
+
+        // --- Resumo final ---
+        System.out.println("========== RESUMO ==========");
+        System.out.println("Total CSV: " + candidatesMap.size());
+        System.out.println("Convertidos com sucesso: " + success.get());
+        System.out.println("Falhados: " + failed.get());
+        System.out.println("Gerados no JSON: " + result.size());
+        System.out.println("============================");
 
         System.out.println("✅ Conversão concluída!");
     }

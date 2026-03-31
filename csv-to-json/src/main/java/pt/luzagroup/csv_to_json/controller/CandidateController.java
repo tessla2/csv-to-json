@@ -24,7 +24,7 @@ public class CandidateController {
         Map<String, Object> response = new HashMap<>();
         try {
             // O CandidateService já gera o arquivo no construtor
-            File jsonFile = new File("/mnt/user-data/outputs/candidates.json");
+            File jsonFile = new File("/src/resources/outputs/candidates.json");
             if (!jsonFile.exists()) {
                 response.put("status", "error");
                 response.put("message", "Arquivo JSON não encontrado. Execute o serviço primeiro.");

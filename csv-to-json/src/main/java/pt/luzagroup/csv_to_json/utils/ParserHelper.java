@@ -57,6 +57,32 @@ public class ParserHelper {
         if (isEmpty(yearsStr)) return 0;
         try { return (int) Double.parseDouble(yearsStr); } catch (NumberFormatException e) { return 0; }
     }
+    public Boolean parseBooleanField(String value) {
+        if (value == null) return null;
+
+        value = value.trim().toLowerCase();
+
+        if (value.isEmpty()) return null;
+
+        // 🔥 limpeza básica
+        value = value.replaceAll("[^a-z0-9]", "");
+
+        // positivos
+        if (value.matches("^(yes|y|true|1|available)$")) return true;
+
+        // negativos
+        if (value.matches("^(no|n|false|0|notavailable)$")) return false;
+
+        // aqui pode remover completamente o tratamento "yesandno"
+        // if (value.contains("yes") && value.contains("no")) return null;
+
+        if (value.contains("yes") || value.contains("true")) return true;
+        if (value.contains("no") || value.contains("false")) return false;
+
+        return null;
+    }
+
+
 
     public String cleanValue(String value) {
         if (value == null || value.trim().isEmpty() || value.equalsIgnoreCase("nan") || value.equalsIgnoreCase("null"))

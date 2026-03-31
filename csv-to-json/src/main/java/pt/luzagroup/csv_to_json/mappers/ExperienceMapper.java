@@ -41,14 +41,21 @@ public class ExperienceMapper {
         for (Map<String, String> exp : experiencesList) {
             if (candidateId.equals(exp.get("Candidate Id"))) {
                 Map<String, Object> e = new LinkedHashMap<>();
+
                 String position = helper.cleanValue(exp.get("Occupation / Title"));
                 if (helper.isEmpty(position)) position = helper.cleanValue(exp.get("Occupation"));
+                if (helper.isEmpty(position)) position = "unknown"; // default
+
+                String employer = helper.cleanValue(exp.get("Company"));
+                if (helper.isEmpty(employer)) employer = "unknown"; // default
 
                 putIfNotEmpty(e, "position_name", position);
-                putIfNotEmpty(e, "employer", helper.cleanValue(exp.get("Company")));
+                putIfNotEmpty(e, "employer", employer);
                 putIfNotEmpty(e, "started_at", helper.parseDate(exp.get("Work Duration_From")));
+
                 String endDate = helper.parseDate(exp.get("Work Duration_To"));
                 if (!helper.isEmpty(endDate)) e.put("ended_at", endDate);
+
                 putIfNotEmpty(e, "description", helper.cleanValue(exp.get("Summary")));
 
                 experiences.add(helper.cleanMap(e));
@@ -82,16 +89,25 @@ public class ExperienceMapper {
         for (Map<String, String> edu : educationList) {
             if (candidateId.equals(edu.get("Candidate Id"))) {
                 Map<String, Object> e = new LinkedHashMap<>();
-                putIfNotEmpty(e, "school", helper.cleanValue(edu.get("Institute / School")));
-                String degree = helper.cleanValue(edu.get("Degree"));
-                if (helper.isEmpty(degree)) degree = helper.cleanValue(edu.get("Academic Degree"));
+
+                String school = helper.cleanValue(edu.get("Institute / School"));
+                if (helper.isEmpty(school)) school = "unknown";
+
+                String degree = helper.cleanValue(edu.get("Academic Degree"));
+                if (helper.isEmpty(degree)) degree = helper.cleanValue(edu.get("Degree"));
+                if (helper.isEmpty(degree)) degree = "unknown";
+
+                putIfNotEmpty(e, "school", school);
                 putIfNotEmpty(e, "degree", degree);
                 putIfNotEmpty(e, "started_at", helper.parseDate(edu.get("Duration_From")));
+
                 String endDate = helper.parseDate(edu.get("Duration_To"));
                 if (!helper.isEmpty(endDate)) e.put("ended_at", endDate);
+
                 putIfNotEmpty(e, "specialization", helper.cleanValue(edu.get("Major / Department")));
                 putIfNotEmpty(e, "description", helper.cleanValue(edu.get("Details")));
-                if (!e.isEmpty()) education.add(helper.cleanMap(e));
+
+                education.add(helper.cleanMap(e));
             }
         }
 
